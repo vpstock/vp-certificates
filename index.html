@@ -19,6 +19,11 @@ body{font-family:var(--sans);background:var(--ground);color:var(--body);font-siz
 .panel{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:20px;align-self:start}
 .panel h2{font-family:var(--serif);font-weight:500;font-size:18px;color:var(--navy);margin-bottom:12px}
 label{display:block;font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:14px 0 4px}
+.opts{margin:14px 0 0;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r);background:#fff}
+.opts .ol{font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.opts label.chk{display:flex;gap:8px;align-items:flex-start;text-transform:none;letter-spacing:0;font-size:13px;font-weight:400;color:var(--ink);margin:6px 0 0;cursor:pointer}
+.opts label.chk input{margin-top:3px;accent-color:var(--royal)}
+.opts label.chk span{color:var(--body)}
 input[type=text]{width:100%;font:inherit;color:var(--ink);padding:9px 11px;border:1px solid var(--line);border-radius:var(--r);background:#fff}
 input[type=text]:focus,button:focus-visible,.tab:focus-visible{outline:2px solid var(--royal);outline-offset:2px;border-color:var(--royal)}
 .locked{display:flex;justify-content:space-between;align-items:center;padding:9px 11px;border:1px dashed var(--line);border-radius:var(--r);background:var(--ground);color:var(--ink);font-weight:600}
@@ -138,6 +143,10 @@ body[data-view=history] #formPanel,body[data-view=history] #previewSec{display:n
   <label for="attn">Attention (name)</label><input id="attn" type="text" autocomplete="off">
   <label for="co">Attention (company)</label><input id="co" type="text" autocomplete="off">
   <label for="stage">Installation stage (optional)</label><input id="stage" type="text" autocomplete="off" placeholder="e.g. Stage 1">
+  <div class="opts"><div class="ol">Add to the installation certificate (optional)</div>
+   <label class="chk"><input type="checkbox" id="opt2665"><div>AS 2665-2001 <span>– Smoke/Heat Venting Systems</span></div></label>
+   <label class="chk"><input type="checkbox" id="opt1668"><div>AS 1668.1 <span>– Fire and Smoke Control in Buildings</span></div></label>
+  </div>
   <div class="btns">
    <button class="primary" id="printOne" type="button">Print or save as PDF: this certificate</button>
    <button class="ghost" id="printAll" type="button">Print or save as PDF: all three</button>
@@ -212,11 +221,14 @@ function build(c,f,d,no){
  fr.appendChild(el("span","l","From"));fr.appendChild(el("div","v","Victorian Projects"));
  bl.appendChild(a);bl.appendChild(fr);s.appendChild(bl);
  s.appendChild(el("h2",null,"Compliance"));s.appendChild(el("p",null,c.text));
- var sd=el("div","std");c.std.forEach(function(r){var x=el("div",null,r[0]+" ");x.appendChild(el("span",null,"– "+r[1]));sd.appendChild(x)});s.appendChild(sd);
+ var stdList=c.std.slice();
+ if(c.id==="install"){if(f.opt1668)stdList.push(["AS 1668.1","Fire and Smoke Control in Buildings"]);if(f.opt2665)stdList.push(["AS 2665-2001","Smoke/Heat Venting Systems"])}
+ var sd=el("div","std");stdList.forEach(function(r){var x=el("div",null,r[0]+" ");x.appendChild(el("span",null,"– "+r[1]));sd.appendChild(x)});s.appendChild(sd);
  var ft=el("footer");ft.appendChild(el("span",null,"Victorian Projects"));
  ft.appendChild(el("span",null,c.title(f).replace("Certificate of Compliance – ","")+" · Project No. "+(f.job||"")+(no?" · Cert. No. "+no:"")));s.appendChild(ft);
  return s}
-function vals(){var f={};ids.forEach(function(i){f[i]=$(i).value.trim()});return f}
+var OPTS=["opt2665","opt1668"];
+function vals(){var f={};ids.forEach(function(i){f[i]=$(i).value.trim()});OPTS.forEach(function(i){f[i]=$(i).checked});return f}
 var active=0;
 function render(nums){
  var f=vals(),d=today(),nx=nextNo(f.job);$("dateShown").textContent=d;
@@ -229,7 +241,7 @@ function fit(){
  var sl=$("slots");sl.style.transform="scale("+sc+")";sl.style.transformOrigin="top left";sl.style.width=px+"px"}
 function tabs(){var t=$("tabs");t.textContent="";CERTS.forEach(function(c,i){var b=el("button","tab",c.tab);b.type="button";b.setAttribute("role","tab");b.setAttribute("aria-selected",i===active);b.onclick=function(){active=i;tabs();render()};t.appendChild(b)})}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(vals()))}catch(e){}}
-function load(){var v=EXAMPLE;try{var s=localStorage.getItem(KEY);if(s)v=Object.assign({},EXAMPLE,JSON.parse(s))}catch(e){}ids.forEach(function(i){$(i).value=v[i]||""})}
+function load(){var v=EXAMPLE;try{var s=localStorage.getItem(KEY);if(s)v=Object.assign({},EXAMPLE,JSON.parse(s))}catch(e){}ids.forEach(function(i){$(i).value=v[i]||""});OPTS.forEach(function(i){$(i).checked=v[i]===true})}
 function doPrint(mode){document.body.setAttribute("data-print",mode);var old=document.title,f=vals();
  document.title=(mode==="all"?"Certificates of Compliance":CERTS[active].title(f))+" \u2013 Job "+f.job;
  window.print();setTimeout(function(){document.title=old;render()},700)}
@@ -300,7 +312,7 @@ $("impBtn").onclick=function(){$("impFile").click()};
 $("impFile").onchange=function(e){var f=e.target.files[0];if(!f)return;var rd=new FileReader();rd.onload=function(){try{var n=mergeRows(JSON.parse(rd.result));hrender();$("hshown").textContent="Restored "+n+" certificate"+(n===1?"":"s")}catch(x){$("hshown").textContent="That file is not a history backup."}e.target.value=""};rd.readAsText(f)};
 $("hsearch").addEventListener("input",hrender);
 $("navNew").onclick=function(){setView("new")};$("navHist").onclick=function(){setView("history")};
-ids.forEach(function(i){$(i).addEventListener("input",render)});
+ids.forEach(function(i){$(i).addEventListener("input",render)});OPTS.forEach(function(i){$(i).addEventListener("change",function(){$("printErr").hidden=true;$("dup").hidden=true;render()})});
 
 var supported=("showOpenFilePicker" in window)&&("showSaveFilePicker" in window),reg={handle:null,perm:false,err:false,last:null},pendingMode=null;
 function idbOpen(){return new Promise(function(res,rej){try{var q=indexedDB.open("vp-cert-tool",1);q.onupgradeneeded=function(){q.result.createObjectStore("kv")};q.onsuccess=function(){res(q.result)};q.onerror=function(){rej(q.error)}}catch(e){rej(e)}})}
@@ -348,7 +360,7 @@ $("printOne").onclick=function(){startPrint("one")};$("printAll").onclick=functi
 $("dupGo").onclick=function(){var m=pendingMode;$("dup").hidden=true;pendingMode=null;if(m)proceed(m)};
 $("dupNo").onclick=function(){$("dup").hidden=true;pendingMode=null};
 ids.forEach(function(i){$(i).addEventListener("input",function(){$("printErr").hidden=true;$("dup").hidden=true})});
-$("reset").onclick=function(){ids.forEach(function(i){$(i).value=EXAMPLE[i]});render()};
+$("reset").onclick=function(){ids.forEach(function(i){$(i).value=EXAMPLE[i]});OPTS.forEach(function(i){$(i).checked=false});render()};
 window.addEventListener("resize",fit);
 hload();load();tabs();render();hrender();regInit();$("histWarn").style.display=storeOK?"none":"block";
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(render);
