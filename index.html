@@ -115,12 +115,14 @@ body[data-view=history] #formPanel,body[data-view=history] #previewSec{display:n
 .dup,.err{margin-top:14px;border-radius:var(--r);padding:10px 12px;font-size:13px}
 .dup{background:#fff7e6;border:1px solid #f0d9a8;color:#5c4400}
 .err{background:#fdecec;border:1px solid #f1b9b9;color:#7a1b1b}
+.editbar{margin-top:14px;border-radius:var(--r);padding:10px 12px;font-size:13px;background:var(--tint);border:1px solid #c9d8f7;color:var(--ink)}
+.editbar button{margin-top:8px}
 .dupbtns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 @page{size:A4;margin:0}
 @media print{
  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
  body{background:#fff}
- .top,.panel,.tabs,.hint,#history,.dup,.err{display:none!important}
+ .top,.panel,.tabs,.hint,#history,.dup,.err,.editbar{display:none!important}
  .app{display:block;padding:0;max-width:none}
  .stage{border:0;padding:0;background:#fff;overflow:visible}
  .fit{width:auto!important;height:auto!important;margin:0}
@@ -144,13 +146,14 @@ body[data-view=history] #formPanel,body[data-view=history] #previewSec{display:n
   <label for="co">Attention (company)</label><input id="co" type="text" autocomplete="off">
   <label for="stage">Installation stage (optional)</label><input id="stage" type="text" autocomplete="off" placeholder="e.g. Stage 1">
   <div class="opts"><div class="ol">Standards on the installation certificate (tick what applies)</div><div id="stdOpts"></div></div>
+  <div class="editbar" id="editBar" hidden><div id="editTxt"></div><button class="ghost mini" id="editCancel" type="button">Stop editing</button></div>
   <div class="btns">
    <button class="primary" id="printOne" type="button">Print or save as PDF: this certificate</button>
    <button class="ghost" id="printAll" type="button">Print or save as PDF: all three</button>
    <button class="reset" id="reset" type="button">Reset to example</button>
   </div>
   <div class="err" id="printErr" role="alert" hidden></div>
-   <div class="dup" id="dup" role="alert" hidden><div id="dupText"></div><div class="dupbtns"><button class="primary mini" id="dupGo" type="button">Print again as a new issue</button><button class="ghost mini" id="dupNo" type="button">Cancel</button></div></div>
+   <div class="dup" id="dup" role="alert" hidden><div id="dupText"></div><div class="dupbtns"><button class="primary mini" id="dupEdit" type="button">Update the existing certificate (same No.)</button><button class="ghost mini" id="dupGo" type="button">Issue as a new certificate instead</button><button class="ghost mini" id="dupNo" type="button">Cancel</button></div></div>
    <p class="hint">In the print window choose "Save as PDF". Turn on "Background graphics" if your browser asks.</p>
  </section>
  <section id="previewSec" aria-label="Preview">
@@ -239,11 +242,11 @@ function setStds(a){STDS.forEach(function(x){var c=$("std_"+x.id);if(c)c.checked
 function defStds(){return STDS.filter(function(x){return x.on}).map(function(x){return x.id})}
 (function(){var box=$("stdOpts");STDS.forEach(function(x){var l=el("label","chk"),i=el("input");i.type="checkbox";i.id="std_"+x.id;var d=el("div",null,x.code+" ");d.appendChild(el("span",null,"– "+x.t));l.appendChild(i);l.appendChild(d);box.appendChild(l)})})();
 function vals(){var f={};ids.forEach(function(i){f[i]=$(i).value.trim()});f.stds=selStds();return f}
-var active=0;
+var active=0,editing=null;
 function render(nums){
  var f=vals(),d=today(),nx=nextNo(f.job);$("dateShown").textContent=d;
  var sl=$("slots");sl.textContent="";
- CERTS.forEach(function(c,i){var w=el("div","slot"+(i===active?" active":""));w.appendChild(build(c,f,d,nums&&nums[i]?nums[i]:nx));sl.appendChild(w)});
+ CERTS.forEach(function(c,i){var w=el("div","slot"+(i===active?" active":""));w.appendChild(build(c,f,d,nums&&nums[i]?nums[i]:(editing&&i===active&&editing.certNo?editing.certNo:nx)));sl.appendChild(w)});
  fit();save()}
 function fit(){
  var wrap=$("stage-wrap"),avail=wrap.clientWidth-40,px=793.7,sc=Math.min(1,avail/px);
@@ -274,13 +277,18 @@ function nextNo(job){job=String(job||"").trim();return job?job+"-"+pad2(maxSeq(j
 function ensureNos(){var changed=false,rows=hist.slice().sort(function(a,b){return a.created<b.created?-1:1});
  rows.forEach(function(r){if(!r.certNo&&jkey(r)){r.certNo=String(r.job).trim()+"-"+pad2(maxSeq(r.job)+1);changed=true}});return changed}
 function cleanRow(r){if(!r||typeof r.id!=="string"||typeof r.created!=="string")return null;
- return {id:r.id,created:r.created,cert:String(r.cert||""),certName:String(r.certName||""),title:String(r.title||""),project:String(r.project||""),address:String(r.address||""),job:String(r.job||""),attn:String(r.attn||""),co:String(r.co||""),stage:String(r.stage||""),certNo:String(r.certNo||"")}}
+ return {id:r.id,created:r.created,cert:String(r.cert||""),certName:String(r.certName||""),title:String(r.title||""),project:String(r.project||""),address:String(r.address||""),job:String(r.job||""),attn:String(r.attn||""),co:String(r.co||""),stage:String(r.stage||""),certNo:String(r.certNo||""),stds:Array.isArray(r.stds)?r.stds.map(String):undefined,updated:r.updated?String(r.updated):undefined}}
 function mergeRows(arr){var have={},n=0;hist.forEach(function(r){have[r.id]=1});
  (Array.isArray(arr)?arr:[]).forEach(function(x){var r=cleanRow(x);if(r&&!have[r.id]){hist.push(r);have[r.id]=1;n++}});
  if(n){ensureNos();hsave();hrender()}return n}
-function logCerts(idxs,nums){var f=vals(),now=new Date().toISOString();
- idxs.forEach(function(i){var c=CERTS[i];hist.push({id:now+"-"+c.id+"-"+Math.random().toString(36).slice(2,7),created:now,cert:c.id,certName:c.tab,title:c.title(f),project:f.project,address:f.address,job:f.job,attn:f.attn,co:f.co,stage:f.stage,certNo:nums[i]})});
+function logCerts(idxs,nums,upd){var f=vals(),now=new Date().toISOString();upd=upd||{};
+ idxs.forEach(function(i){var c=CERTS[i],m=upd[i];
+  if(m){m.certNo=nums[i];m.cert=c.id;m.certName=c.tab;m.title=c.title(f);m.project=f.project;m.address=f.address;m.job=f.job;m.attn=f.attn;m.co=f.co;m.stage=f.stage;m.stds=f.stds.slice();m.updated=now}
+  else hist.push({id:now+"-"+c.id+"-"+Math.random().toString(36).slice(2,7),created:now,cert:c.id,certName:c.tab,title:c.title(f),project:f.project,address:f.address,job:f.job,attn:f.attn,co:f.co,stage:f.stage,certNo:nums[i],stds:f.stds.slice()})});
  hsave();hrender();regPush().then(regUI)}
+function findExisting(f,c){return hist.filter(function(r){return jkey(r)===jkey(f)&&r.cert===c.id&&(c.id!=="install"||(r.stage||"")===f.stage)}).sort(function(a,b){return a.created<b.created?1:-1})[0]||null}
+function editBanner(){var b=$("editBar");if(!editing){b.hidden=true;return}$("editTxt").textContent="Editing "+editing.certName+" No. "+(editing.certNo||"")+". Printing saves your changes under the same number. No new certificate is issued.";b.hidden=false}
+function startEdit(r){editing={id:r.id,certNo:r.certNo,certName:r.certName};ids.forEach(function(i){$(i).value=r[i]||""});setStds(Array.isArray(r.stds)?r.stds:defStds());var k=CERTS.findIndex(function(z){return z.id===r.cert});if(k>-1)active=k;tabs();editBanner();setView("new");render()}
 var openKeys={};
 function gkey(r){return (String(r.job||"").trim().toLowerCase())||(String(r.project||"").trim().toLowerCase())||"no-job"}
 function hrender(){
@@ -304,11 +312,11 @@ function hrender(){
   var tb=el("tbody");
   g.rows.forEach(function(r){var tr=el("tr");
    tr.appendChild(el("td","num",r.certNo||"\u2013"));
-   tr.appendChild(el("td","num",fmtDT(r.created)));
+   var ct=el("td","num",fmtDT(r.created));if(r.updated)ct.appendChild(el("div","sub","Edited "+fmtDT(r.updated)));tr.appendChild(ct);
    var c=el("td");c.appendChild(el("span","pill",r.certName||r.cert));if(r.stage)c.appendChild(el("div","sub",r.stage));tr.appendChild(c);
    var a=el("td",null,r.attn||"");if(r.co)a.appendChild(el("div","sub",r.co));tr.appendChild(a);
-   var x=el("td"),lb=el("button","ghost mini","Load");lb.type="button";lb.title="Put these details back in the form";
-   lb.onclick=function(){ids.forEach(function(i){$(i).value=r[i]||""});var k=CERTS.findIndex(function(z){return z.id===r.cert});if(k>-1)active=k;tabs();setView("new");render()};
+   var x=el("td"),lb=el("button","ghost mini","Edit");lb.type="button";lb.title="Open this certificate to edit it. It keeps the same certificate number.";
+   lb.onclick=function(){startEdit(r)};
    x.appendChild(lb);tr.appendChild(x);tb.appendChild(tr)});
   t.appendChild(tb);bd.appendChild(t);d.appendChild(bd);L.appendChild(d)})}
 function setView(v){document.body.setAttribute("data-view",v);$("navNew").setAttribute("aria-pressed",v==="new");$("navHist").setAttribute("aria-pressed",v==="history");if(v==="new")fit();else{hrender();regPull().then(regUI)}}
@@ -356,21 +364,27 @@ function startPrint(mode){
  $("printErr").hidden=true;$("dup").hidden=true;pendingMode=null;
  var f=vals();if(!f.job){showErr("Enter a job number first. It is used for the certificate number.");$("job").focus();return}
  var go=function(){
+  if(editing&&mode==="one"){proceed(mode);return}
   var idxs=mode==="all"?[0,1,2]:[active],dups=[];
-  idxs.forEach(function(i){var c=CERTS[i],m=hist.filter(function(r){return jkey(r)===jkey(f)&&r.cert===c.id&&(c.id!=="install"||(r.stage||"")===f.stage)}).sort(function(a,b){return a.created<b.created?1:-1})[0];
+  idxs.forEach(function(i){var c=CERTS[i],m=findExisting(f,c);
    if(m)dups.push(m.certName+" was already issued for job "+f.job+(m.certNo?" (No. "+m.certNo+")":"")+" on "+fmtDT(m.created)+".")});
   if(dups.length){pendingMode=mode;$("dupText").textContent=dups.join(" ");$("dup").hidden=false;return}
   proceed(mode)};
  regPull().then(go,go)}
-function proceed(mode){
- var f=vals(),idxs=mode==="all"?[0,1,2]:[active],base=maxSeq(f.job),nums=[];
- idxs.forEach(function(i,k){nums[i]=f.job+"-"+pad2(base+1+k)});
- render(nums);logCerts(idxs,nums);doPrint(mode)}
+function proceed(mode,asNew){
+ var f=vals(),idxs=mode==="all"?[0,1,2]:[active],base=maxSeq(f.job),nums=[],upd={},k=0;
+ idxs.forEach(function(i){var c=CERTS[i],m=null;
+  if(editing&&mode==="one")m=hist.filter(function(r){return r.id===editing.id})[0]||null;
+  else if(!asNew)m=findExisting(f,c);
+  if(m&&m.certNo){nums[i]=m.certNo;upd[i]=m}else{nums[i]=f.job+"-"+pad2(base+1+k++);if(m)upd[i]=m}});
+ render(nums);logCerts(idxs,nums,upd);if(editing&&mode==="one"){editing.certNo=nums[active]}doPrint(mode)}
 $("printOne").onclick=function(){startPrint("one")};$("printAll").onclick=function(){startPrint("all")};
-$("dupGo").onclick=function(){var m=pendingMode;$("dup").hidden=true;pendingMode=null;if(m)proceed(m)};
+$("dupEdit").onclick=function(){var m=pendingMode;$("dup").hidden=true;pendingMode=null;if(m)proceed(m,false)};
+$("dupGo").onclick=function(){var m=pendingMode;$("dup").hidden=true;pendingMode=null;if(m)proceed(m,true)};
+$("editCancel").onclick=function(){editing=null;editBanner();render()};
 $("dupNo").onclick=function(){$("dup").hidden=true;pendingMode=null};
 ids.forEach(function(i){$(i).addEventListener("input",function(){$("printErr").hidden=true;$("dup").hidden=true})});
-$("reset").onclick=function(){ids.forEach(function(i){$(i).value=EXAMPLE[i]});setStds(defStds());render()};
+$("reset").onclick=function(){ids.forEach(function(i){$(i).value=EXAMPLE[i]});setStds(defStds());editing=null;editBanner();render()};
 window.addEventListener("resize",fit);
 hload();load();tabs();render();hrender();regInit();$("histWarn").style.display=storeOK?"none":"block";
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(render);
